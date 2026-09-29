@@ -8,8 +8,8 @@ from pathlib import Path
 import cv2
 
 from gester.config import CameraConfig, SteeringConfig
-from gester.gamepad import VirtualGamepad
 from gester.gestures import controls_from_hands
+from gester.keyboard import KeyboardController
 from gester.overlay import draw_controls_legend, draw_hud, draw_steering
 from gester.steering import SteeringEngine
 from gester.tracking import HandTracker, draw_hand
@@ -62,20 +62,28 @@ def main() -> int:
 
     engine = SteeringEngine(steering_config)
     try:
-        gamepad = VirtualGamepad()
+        keyboard = KeyboardController()
     except RuntimeError as error:
         print(f"WARNING: {error}")
         print("Continuing in display-only mode.")
-        gamepad = None
+        keyboard = None
 
     previous_time = time.perf_counter()
     fps = 0.0
     last_timestamp_ms = -1
 
     print("Gester v0.1 running.")
-    print("Hold both hands as if you are gripping an imaginary steering wheel.")
-    print("Press Q or ESC to quit.")
+    print("Keyboard bindings:")
+    print("  Rotate hands: A/D steering")
+    print("  Both fists: W accelerate")
+    print("  Both palms open: S reverse")
+    print("  Right fist + left open palm: SPACE drift")
+    print("  Thumbs-up (either hand): SHIFT nitro")
+    print("  Index finger pointing (either hand): CTRL shoot")
+    print("Keep the game window focused to receive keyboard input.")
+    print("Close the camera window to quit.")
 
+    last_action_text = None
     try:
         with HandTracker(DEFAULT_MODEL) as tracker:
             while True:
@@ -99,34 +107,42 @@ def main() -> int:
                     draw_hand(frame, hand)
 
                 reading = None
-                gesture_text = "SHOW BOTH HANDS"
+                gestures = controls_from_hands(hands)
                 if len(hands) >= 2:
                     reading = engine.calculate(hands[0], hands[1])
-                    gestures = controls_from_hands(hands[0], hands[1])
-                    gesture_names = []
-                    if gestures.accelerate:
-                        gesture_names.append("ACCEL")
-                    if gestures.brake:
-                        gesture_names.append("BRAKE")
-                    if gestures.nitro:
-                        gesture_names.append("NITRO")
-                    if gestures.drift:
-                        gesture_names.append("DRIFT")
-                    gesture_text = "GESTURE: " + (" + ".join(gesture_names) if gesture_names else "NONE")
-                    if gamepad is not None:
-                        gamepad.set_controls(
-                            steering=reading.value,
-                            accelerate=gestures.accelerate,
-                            brake=gestures.brake,
-                            nitro=gestures.nitro,
-                            drift=gestures.drift,
-                        )
                     draw_steering(frame, reading)
                 else:
                     # Safety behavior: no reliable two-hand steering means neutral.
                     engine.reset()
-                    if gamepad is not None:
-                        gamepad.reset()
+
+                if keyboard is not None:
+                    keyboard.set_controls(
+                        steering=0.0 if reading is None else reading.value,
+                        accelerate=gestures.accelerate,
+                        brake=gestures.brake,
+                        nitro=gestures.nitro,
+                        drift=gestures.drift,
+                        shoot=gestures.shoot,
+                    )
+
+                active_keys = []
+                if reading is not None and reading.value <= -KeyboardController.steering_threshold:
+                    active_keys.append("A STEER")
+                elif reading is not None and reading.value >= KeyboardController.steering_threshold:
+                    active_keys.append("D STEER")
+                for is_active, label in (
+                    (gestures.accelerate, "W ACCEL"),
+                    (gestures.brake, "S REVERSE"),
+                    (gestures.drift, "SPACE DRIFT"),
+                    (gestures.nitro, "SHIFT NITRO"),
+                    (gestures.shoot, "CTRL SHOOT"),
+                ):
+                    if is_active:
+                        active_keys.append(label)
+                gesture_text = "ACTIVE: " + (" + ".join(active_keys) if active_keys else "NONE")
+                if gesture_text != last_action_text:
+                    print(gesture_text)
+                    last_action_text = gesture_text
 
                 now = time.perf_counter()
                 instantaneous_fps = 1.0 / max(now - previous_time, 1e-6)
@@ -146,8 +162,8 @@ def main() -> int:
                 ) < 1:
                     break
     finally:
-        if gamepad is not None:
-            gamepad.close()
+        if keyboard is not None:
+            keyboard.close()
         camera.release()
         cv2.destroyAllWindows()
 

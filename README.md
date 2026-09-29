@@ -1,10 +1,10 @@
 # Gester v0.1
 
-Gester is a Python computer-vision prototype that turns two hands in front of a webcam into virtual Xbox controller input for racing games.
+Gester is a Python computer-vision prototype that turns hand gestures in front of a webcam into keyboard input for games.
 
 The current milestone supports steering, acceleration, braking, nitro, and drift/skid input:
 
-`webcam -> MediaPipe hand landmarks -> gestures -> virtual Xbox controller -> game`
+`webcam -> MediaPipe hand landmarks -> gestures -> keyboard input -> game`
 
 ## What v0.1 does
 
@@ -18,9 +18,7 @@ The current milestone supports steering, acceleration, braking, nitro, and drift
 - Converts it to a `-1.0 .. +1.0` steering signal.
 - Applies a center dead zone and exponential smoothing.
 - Immediately returns to neutral if two hands are not visible.
-- Sends steering to the virtual Xbox left-stick X axis.
-- Sends acceleration and braking to the right and left triggers.
-- Sends nitro to Xbox A and drift/skid to Xbox Left Shoulder.
+- Sends steering and gesture actions as held keyboard keys to the focused application.
 - Shows FPS and steering information in a live HUD.
 
 ## Recommended environment
@@ -40,8 +38,8 @@ python setup_model.py
 python main.py
 ```
 
-The virtual controller also requires the **ViGEmBus** driver on Windows. If it
-is unavailable, Gester continues in display-only mode.
+Keep the game window focused while Gester is running so it receives keyboard
+input. PyDirectInput is used for game-compatible key events.
 
 If PowerShell blocks virtual-environment activation, you can use Command Prompt instead:
 
@@ -66,20 +64,18 @@ python main.py
 
 The preview is mirrored. Keep both palms separated horizontally:
 
-| Gesture | Virtual Xbox input |
+| Gesture | Keyboard input |
 | --- | --- |
-| Rotate both hands like a wheel | Left stick X: steering |
-| Open hand on screen-right | Right trigger: accelerate |
-| Open hand on screen-left | Left trigger: brake/reverse |
-| Fist on screen-right | A button: nitro |
-| Fist on screen-left | Left Shoulder: drift/skid |
+| Rotate both hands left/right | A/D: steer |
+| Make fists with both hands | W: accelerate |
+| Open both palms | S: reverse |
+| Fist on screen-right, open palm on screen-left | Space: drift/skid |
+| Thumbs-up with either hand | Shift: nitro |
+| Point with index finger only, either hand | Ctrl: shoot |
 
-The separate **Gester Controls** window also lists the planned gestures for
-fire, look back, rescue, and pause. Those four gestures are displayed for the
-next control milestone but are not active yet.
-
-For SuperTuxKart, open the controller settings and bind steering, accelerate,
-brake/reverse, nitro, and skid to those virtual Xbox inputs.
+Steering presses A or D after the steering angle crosses a small threshold;
+keyboard steering is digital rather than analog. Active keys are shown in the
+terminal and camera overlay. Only the six mappings above are active.
 
 Expected output:
 
@@ -146,23 +142,17 @@ Gester_v0_1/
 │   ├── tracking.py
 │   ├── steering.py
 │   ├── gestures.py
-│   ├── gamepad.py
+│   ├── keyboard.py
 │   └── overlay.py
 └── tests/
+    ├── test_keyboard.py
     └── test_steering.py
 ```
 
 The important architecture is:
 
 ```text
-Camera
-  -> HandTracker
-  -> Gesture/Steering Engine
-  -> VehicleState
-  -> Output Adapter
-       -> Debug
-       -> Keyboard
-      -> Virtual Xbox controller
+Camera -> HandTracker -> Gesture/Steering Engine -> KeyboardController -> Game
 ```
 
 That keeps game compatibility separate from computer vision.

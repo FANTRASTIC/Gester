@@ -75,8 +75,8 @@ def draw_controls_legend(frame, *, gesture_text: str = "") -> None:
     height, width = frame.shape[:2]
     panel_left = 18
     panel_bottom = height - 18
-    panel_top = max(190, height - 225)
-    panel_right = min(width - 18, 390)
+    panel_top = max(190, height - 250)
+    panel_right = min(width - 18, 560)
     cv2.rectangle(
         frame,
         (panel_left, panel_top),
@@ -86,12 +86,13 @@ def draw_controls_legend(frame, *, gesture_text: str = "") -> None:
     )
 
     lines = (
-        "GESTURES",
-        "Rotate both hands  STEER",
-        "Right open palm    ACCEL",
-        "Left open palm     BRAKE",
-        "Right fist         NITRO",
-        "Left fist          DRIFT",
+        "KEYBOARD CONTROLS",
+        "Rotate hands: A/D steer",
+        "Both fists: W accelerate",
+        "Both palms open: S reverse",
+        "Right fist + left open: SPACE drift",
+        "Thumbs-up: SHIFT nitro",
+        "Index point: CTRL shoot",
     )
     for index, text in enumerate(lines):
         cv2.putText(
@@ -99,7 +100,7 @@ def draw_controls_legend(frame, *, gesture_text: str = "") -> None:
             text,
             (34, panel_top + 32 + index * 32),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.82 if index else 0.92,
+            0.62 if index else 0.72,
             (255, 255, 255),
             2,
             cv2.LINE_AA,
@@ -124,21 +125,14 @@ def draw_controls_window() -> None:
     canvas = np.zeros((470, 820, 3), dtype=np.uint8)
     canvas[:] = (24, 24, 24)
     lines = (
-        ("HANDRIVE CONTROLS", 0.95, 2, (255, 255, 255)),
-        ("ACTIVE NOW", 0.62, 2, (80, 220, 120)),
-        ("Rotate both hands like a wheel     STEERING", 0.62, 1, (255, 255, 255)),
-        ("Right open palm                    ACCELERATE", 0.62, 1, (255, 255, 255)),
-        ("Left open palm                     BRAKE / REVERSE", 0.62, 1, (255, 255, 255)),
-        ("Right fist                         NITRO", 0.62, 1, (255, 255, 255)),
-        ("Left fist                          SKIDDING", 0.62, 1, (255, 255, 255)),
-        ("", 0.62, 1, (255, 255, 255)),
-        ("NEXT GESTURES TO ADD", 0.62, 2, (80, 180, 255)),
-        ("Thumbs-up                          FIRE", 0.62, 1, (190, 190, 190)),
-        ("Right palm held outward             LOOK BACK", 0.62, 1, (190, 190, 190)),
-        ("Both open hands above shoulders     RESCUE (hold 1 sec)", 0.62, 1, (190, 190, 190)),
-        ("Both fists held together            PAUSE (hold 1 sec)", 0.62, 1, (190, 190, 190)),
-        ("", 0.62, 1, (255, 255, 255)),
-        ("Keep both hands visible for steering.", 0.56, 1, (255, 255, 255)),
+        ("GESTER KEYBOARD CONTROLS", 0.95, 2, (255, 255, 255)),
+        ("Rotate hands: A/D steering", 0.62, 1, (255, 255, 255)),
+        ("Both fists: W accelerate", 0.62, 1, (255, 255, 255)),
+        ("Both palms open: S reverse", 0.62, 1, (255, 255, 255)),
+        ("Right fist + left open: SPACE drift", 0.62, 1, (255, 255, 255)),
+        ("Thumbs-up, either hand: SHIFT nitro", 0.62, 1, (255, 255, 255)),
+        ("Index point, either hand: CTRL shoot", 0.62, 1, (255, 255, 255)),
+        ("Keep the game window focused for input.", 0.56, 1, (190, 190, 190)),
     )
     for index, (text, scale, thickness, color) in enumerate(lines):
         cv2.putText(

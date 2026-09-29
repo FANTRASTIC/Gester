@@ -13,6 +13,14 @@ class GestureState:
     brake: bool = False
     nitro: bool = False
     drift: bool = False
+    shoot: bool = False
+
+
+def _finger_is_extended(landmarks: Sequence[object], tip: int, joint: int) -> bool:
+    wrist = landmarks[0]
+    return hypot(landmarks[tip].x - wrist.x, landmarks[tip].y - wrist.y) > (
+        hypot(landmarks[joint].x - wrist.x, landmarks[joint].y - wrist.y) * 1.15
+    )
 
 
 def extended_finger_count(landmarks: Sequence[object]) -> int:
@@ -26,13 +34,8 @@ def extended_finger_count(landmarks: Sequence[object]) -> int:
     if len(landmarks) < 21:
         raise ValueError("Expected 21 hand landmarks.")
 
-    wrist = landmarks[0]
     pairs = ((8, 6), (12, 10), (16, 14), (20, 18))
-    return sum(
-        hypot(landmarks[tip].x - wrist.x, landmarks[tip].y - wrist.y)
-        > hypot(landmarks[joint].x - wrist.x, landmarks[joint].y - wrist.y) * 1.15
-        for tip, joint in pairs
-    )
+    return sum(_finger_is_extended(landmarks, tip, joint) for tip, joint in pairs)
 
 
 def is_open_hand(landmarks: Sequence[object]) -> bool:
@@ -40,31 +43,61 @@ def is_open_hand(landmarks: Sequence[object]) -> bool:
 
 
 def is_fist(landmarks: Sequence[object]) -> bool:
-    return extended_finger_count(landmarks) == 0
+    return extended_finger_count(landmarks) == 0 and not is_thumbs_up(landmarks)
 
 
-def controls_from_hands(
-    hand_a: Sequence[object], hand_b: Sequence[object]
-) -> GestureState:
-    """Map screen-left and screen-right hands to driving controls.
+def is_thumbs_up(landmarks: Sequence[object]) -> bool:
+    """Detect an upward-pointing thumb while the four fingers are curled."""
 
-    The preview is mirrored, so screen-right is the user's right-hand side.
-    Open right hand accelerates; open left hand brakes. Fists trigger nitro
-    on the right and drift/skid on the left.
-    """
-
-    first_center = palm_center(hand_a)
-    second_center = palm_center(hand_b)
-    left_hand, right_hand = sorted(
-        ((first_center, hand_a), (second_center, hand_b)),
-        key=lambda item: item[0].x,
+    if len(landmarks) < 21 or extended_finger_count(landmarks) != 0:
+        return False
+    thumb_ip = landmarks[3]
+    thumb_tip = landmarks[4]
+    return (
+        _finger_is_extended(landmarks, 4, 3)
+        and thumb_tip.y < thumb_ip.y
     )
 
-    _, left_landmarks = left_hand
-    _, right_landmarks = right_hand
+
+def is_pointing(landmarks: Sequence[object]) -> bool:
+    """Detect an index finger extended by itself."""
+
+    if len(landmarks) < 21 or extended_finger_count(landmarks) != 1:
+        return False
+    return _finger_is_extended(landmarks, 8, 6)
+
+
+def controls_from_hands(hands: Sequence[Sequence[object]]) -> GestureState:
+    """Map the visible hand poses to keyboard driving actions.
+
+    Two fists accelerate; two open palms reverse. A right fist with a left
+    open palm drifts. Thumbs-up and index-pointing work with either hand.
+    """
+
+    if not hands:
+        return GestureState()
+
+    ordered_hands = sorted(hands, key=lambda hand: palm_center(hand).x)
+    left_hand = ordered_hands[0]
+    right_hand = ordered_hands[-1]
+    both_hands_visible = len(ordered_hands) >= 2
+
     return GestureState(
-        accelerate=is_open_hand(right_landmarks),
-        brake=is_open_hand(left_landmarks),
-        nitro=is_fist(right_landmarks),
-        drift=is_fist(left_landmarks),
+        accelerate=(
+            both_hands_visible
+            and is_fist(left_hand)
+            and is_fist(right_hand)
+        ),
+        brake=(
+            both_hands_visible
+            and is_open_hand(left_hand)
+            and is_open_hand(right_hand)
+        ),
+        nitro=any(is_thumbs_up(hand) for hand in ordered_hands),
+        drift=(
+            both_hands_visible
+            and is_open_hand(left_hand)
+            and is_fist(right_hand)
+        ),
+        shoot=any(is_pointing(hand) for hand in ordered_hands),
     )
